@@ -8,9 +8,287 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
+        // Globale Variablen
+        let isRouteMode = false;
+        let routeStartLocation = null;
+        let routeDestinationLocation = null;
+        let currentRouteLayer = null;
+        
         // Marker-Gruppe für Suchergebnisse
         let markersGroup = L.layerGroup().addTo(map);
         let currentLocationMarker = null;
+
+        // Route Mode Toggle - MUSS vor setupRouteSearch definiert werden
+        function toggleRouteMode() {
+            console.log('toggleRouteMode called!'); // Debug
+            const searchBar = document.getElementById('searchBar');
+            const singleSearch = document.getElementById('singleSearch');
+            const routeContainer = document.getElementById('routeContainer');
+            const searchInput = document.getElementById('searchInput');
+            const destinationInput = document.getElementById('destinationInput');
+            
+            console.log('Elements found:', {searchBar, singleSearch, routeContainer}); // Debug
+            
+            isRouteMode = !isRouteMode;
+            
+            if (isRouteMode) {
+                // Zu Route Mode wechseln
+                searchBar.classList.add('route-mode');
+                singleSearch.classList.add('hidden');
+                routeContainer.classList.add('active');
+                
+                // Setup für Route-Suche beim ersten Mal
+                setupRouteSearch();
+                
+                // Wenn bereits etwas in der Suchleiste steht, als Ziel übernehmen
+                if (searchInput.value.trim()) {
+                    destinationInput.value = searchInput.value;
+                    searchInput.value = '';
+                }
+                
+                // Focus auf Startpunkt
+                setTimeout(() => {
+                    const startInput = document.getElementById('startInput');
+                    if (startInput) startInput.focus();
+                }, 100);
+            } else {
+                // Zurück zu Single Search
+                searchBar.classList.remove('route-mode');
+                singleSearch.classList.remove('hidden');
+                routeContainer.classList.remove('active');
+                
+                // Route löschen falls vorhanden
+                if (currentRouteLayer) {
+                    map.removeLayer(currentRouteLayer);
+                    currentRouteLayer = null;
+                }
+                
+                // Route-Daten zurücksetzen
+                routeStartLocation = null;
+                routeDestinationLocation = null;
+                
+                // Inputs leeren
+                const startInput = document.getElementById('startInput');
+                const destInput = document.getElementById('destinationInput');
+                if (startInput) startInput.value = '';
+                if (destInput) destInput.value = '';
+            }
+        }
+
+        // Route Inputs vertauschen
+        function swapRouteInputs() {
+            const startInput = document.getElementById('startInput');
+            const destinationInput = document.getElementById('destinationInput');
+            
+            const tempValue = startInput.value;
+            startInput.value = destinationInput.value;
+            destinationInput.value = tempValue;
+            
+            const tempLocation = routeStartLocation;
+            routeStartLocation = routeDestinationLocation;
+            routeDestinationLocation = tempLocation;
+            
+            if (routeStartLocation && routeDestinationLocation) {
+                calculateRoute();
+            }
+        }
+        //let currentLocationMarker = null;
+
+        // Route-spezifische Suchfunktionen
+        function setupRouteSearch() {
+            console.log('setupRouteSearch called'); // Debug
+            const startInput = document.getElementById('startInput');
+            const destinationInput = document.getElementById('destinationInput');
+            
+            if (!startInput || !destinationInput) {
+                console.log('Route inputs not found yet, retrying...'); // Debug
+                setTimeout(setupRouteSearch, 100);
+                return;
+            }
+            
+            // Live-Suche für Startpunkt
+            let startTimeout;
+            startInput.addEventListener('input', function() {
+                clearTimeout(startTimeout);
+                const query = this.value.trim();
+                
+                if (query.length < 3) {
+                    document.getElementById('startSuggestions').style.display = 'none';
+                    document.getElementById('startContainer').classList.remove('has-suggestions');
+                    return;
+                }
+                
+                startTimeout = setTimeout(() => {
+                    showRouteSuggestions(query, 'start');
+                }, 300);
+            });
+            
+            // Live-Suche für Zielort
+            let destinationTimeout;
+            destinationInput.addEventListener('input', function() {
+                clearTimeout(destinationTimeout);
+                const query = this.value.trim();
+                
+                if (query.length < 3) {
+                    document.getElementById('destinationSuggestions').style.display = 'none';
+                    document.getElementById('destinationContainer').classList.remove('has-suggestions');
+                    return;
+                }
+                
+                destinationTimeout = setTimeout(() => {
+                    showRouteSuggestions(query, 'destination');
+                }, 300);
+            });
+            
+            // Enter-Taste Handling
+            startInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && this.value.trim()) {
+                    searchAndSetRouteLocation(this.value.trim(), 'start');
+                }
+            });
+            
+            destinationInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && this.value.trim()) {
+                    searchAndSetRouteLocation(this.value.trim(), 'destination');
+                }
+            });
+        }
+
+        async function showRouteSuggestions(query, type) {
+            const suggestionsDiv = document.getElementById(type + 'Suggestions');
+            const container = document.getElementById(type + 'Container');
+            
+            try {
+                const results = await searchOpenStreetMap(query, 5);
+                
+                if (results.length === 0) {
+                    suggestionsDiv.style.display = 'none';
+                    container.classList.remove('has-suggestions');
+                    return;
+                }
+                
+                suggestionsDiv.innerHTML = '';
+                results.forEach(result => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.onclick = () => selectRouteLocation(result, type);
+                    
+                    item.innerHTML = `
+                        <div class="suggestion-content">
+                            <div class="suggestion-name">${getDisplayName(result)}</div>
+                            <div class="suggestion-details">${result.type}</div>
+                        </div>
+                    `;
+                    
+                    suggestionsDiv.appendChild(item);
+                });
+                
+                container.classList.add('has-suggestions');
+                suggestionsDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Fehler bei der Route-Suche:', error);
+                suggestionsDiv.style.display = 'none';
+                container.classList.remove('has-suggestions');
+            }
+        }
+
+        function selectRouteLocation(location, type) {
+            const input = document.getElementById(type + 'Input');
+            const suggestionsDiv = document.getElementById(type + 'Suggestions');
+            const container = document.getElementById(type + 'Container');
+            
+            // Input setzen
+            input.value = getDisplayName(location);
+            
+            // Suggestions verstecken
+            suggestionsDiv.style.display = 'none';
+            container.classList.remove('has-suggestions');
+            
+            // Location speichern
+            if (type === 'start') {
+                routeStartLocation = location;
+            } else {
+                routeDestinationLocation = location;
+            }
+            
+            // Route berechnen wenn beide Punkte gesetzt sind
+            if (routeStartLocation && routeDestinationLocation) {
+                calculateRoute();
+            }
+        }
+
+        async function searchAndSetRouteLocation(query, type) {
+            try {
+                const results = await searchOpenStreetMap(query, 1);
+                if (results.length > 0) {
+                    selectRouteLocation(results[0], type);
+                }
+            } catch (error) {
+                console.error('Fehler bei der Suche:', error);
+            }
+        }
+
+        // Route berechnen (vereinfachte Version - gerade Linie)
+        function calculateRoute() {
+            if (!routeStartLocation || !routeDestinationLocation) {
+                return;
+            }
+            
+            // Alte Route entfernen
+            if (currentRouteLayer) {
+                map.removeLayer(currentRouteLayer);
+            }
+            
+            // Neue Route als gerade Linie (für echte Routenberechnung wäre eine Routing-API nötig)
+            const routeCoords = [
+                [routeStartLocation.lat, routeStartLocation.lon],
+                [routeDestinationLocation.lat, routeDestinationLocation.lon]
+            ];
+            
+            currentRouteLayer = L.polyline(routeCoords, {
+                color: '#4285f4',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Marker für Start und Ziel
+            markersGroup.clearLayers();
+            
+            const startMarker = L.marker([routeStartLocation.lat, routeStartLocation.lon], {
+                icon: L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iOCIgZmlsbD0iIzM0YTg1MyIvPgo8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI0IiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).bindPopup(`<b>Start:</b><br>${getDisplayName(routeStartLocation)}`);
+            
+            const destMarker = L.marker([routeDestinationLocation.lat, routeDestinationLocation.lon], {
+                icon: L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iOCIgZmlsbD0iI2VhNDMzNSIvPgo8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI0IiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).bindPopup(`<b>Ziel:</b><br>${getDisplayName(routeDestinationLocation)}`);
+            
+            markersGroup.addLayer(startMarker);
+            markersGroup.addLayer(destMarker);
+            
+            // Karte auf Route zentrieren
+            map.fitBounds(currentRouteLayer.getBounds(), { padding: [20, 20] });
+            
+            // Entfernung berechnen
+            const distance = map.distance(
+                [routeStartLocation.lat, routeStartLocation.lon],
+                [routeDestinationLocation.lat, routeDestinationLocation.lon]
+            );
+            
+            showLocationInfo({
+                name: `Route: ${getDisplayName(routeStartLocation)} → ${getDisplayName(routeDestinationLocation)}`,
+                lat: (routeStartLocation.lat + routeDestinationLocation.lat) / 2,
+                lon: (routeStartLocation.lon + routeDestinationLocation.lon) / 2,
+                type: `Entfernung: ${(distance / 1000).toFixed(1)} km`
+            });
+        }
 
         // Deine OpenStreetMap-Suchfunktion
         async function searchOpenStreetMap(query, maxResults = 10) {
@@ -239,12 +517,23 @@
 
         // Suggestions verstecken beim Klick außerhalb
         document.addEventListener('click', function(e) {
-            if (!e.target.closest('.search-container')) {
+            if (!e.target.closest('.search-container') && !e.target.closest('.route-input-container')) {
                 const searchContainer = document.querySelector('.search-container');
                 suggestionsDiv.style.display = 'none';
-                searchContainer.classList.remove('has-suggestions');
+                if (searchContainer) {
+                    searchContainer.classList.remove('has-suggestions');
+                }
+                
+                // Route suggestions auch verstecken
+                document.getElementById('startSuggestions').style.display = 'none';
+                document.getElementById('destinationSuggestions').style.display = 'none';
+                document.getElementById('startContainer').classList.remove('has-suggestions');
+                document.getElementById('destinationContainer').classList.remove('has-suggestions');
             }
         });
+
+        // Initialisierung - Setup wird automatisch beim ersten Toggle aufgerufen
+        console.log('Script loaded successfully'); // Debug
 
         // Enter-Taste für Suche
         searchInput.addEventListener('keypress', function(e) {

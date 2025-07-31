@@ -1,4 +1,4 @@
- * {
+* {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -20,6 +20,119 @@
             top: 20px;
             left: 20px;
             z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .search-bar.route-mode {
+            top: 20px;
+        }
+
+        .route-container {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .route-container.active {
+            display: flex;
+        }
+
+        .single-search {
+            display: block;
+        }
+
+        .single-search.hidden {
+            display: none;
+        }
+
+        .route-input-container {
+            position: relative;
+            width: 350px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .route-input-container.has-suggestions {
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .route-input {
+            width: 100%;
+            padding: 16px 120px 16px 50px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            background: transparent;
+        }
+
+        .route-input-container.has-suggestions .route-input {
+            border-radius: 8px 8px 0 0;
+        }
+
+        .route-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: #666;
+        }
+
+        .route-icon.start::before {
+            content: "🟢";
+        }
+
+        .route-icon.destination::before {
+            content: "🔴";
+        }
+
+        .route-controls {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+        }
+
+        .route-btn {
+            background: transparent;
+            color: #666;
+            border: none;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        .route-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .close-route-btn {
+            background: #f8f9fa;
+            color: #666;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+        }
+
+        .close-route-btn:hover {
+            background: #e8eaed;
         }
 
         .search-container {
@@ -38,7 +151,7 @@
 
         .search-input {
             width: 100%;
-            padding: 16px 50px 16px 16px;
+            padding: 16px 90px 16px 16px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
@@ -56,7 +169,7 @@
 
         .search-btn {
             position: absolute;
-            right: 8px;
+            right: 48px;
             top: 50%;
             transform: translateY(-50%);
             background: transparent;
@@ -72,6 +185,28 @@
         }
 
         .search-btn:hover {
+            background: #f5f5f5;
+            border-radius: 50%;
+        }
+
+        .route-toggle-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            color: #666;
+            border: none;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .route-toggle-btn:hover {
             background: #f5f5f5;
             border-radius: 50%;
         }
