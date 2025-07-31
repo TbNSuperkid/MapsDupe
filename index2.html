@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyMaps</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="style.css"/>
+    
+</head>
+<body>
+    <div class="container">
+        <div class="search-bar">
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Suche nach Orten, Adressen oder Sehenswürdigkeiten..." id="searchInput">
+                <button class="search-btn" onclick="performSearch()">🔍</button>
+                <div class="suggestions" id="suggestions"></div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="controls">
+            <button class="control-btn" onclick="zoomIn()" title="Vergrößern">+</button>
+            <button class="control-btn" onclick="zoomOut()" title="Verkleinern">−</button>
+            <button class="control-btn" onclick="locateUser()" title="Mein Standort">📍</button>
+        </div>
+        
+        <div class="location-info" id="locationInfo" style="display: none;">
+            <div id="locationText"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Suche läuft...</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
