@@ -422,7 +422,11 @@ function closeRoutePopup() {
         map.removeLayer(oceanRouteLayer);
         oceanRouteLayer = null;
     }
+    
+    // Start- und Zielmarker löschen
+    markersGroup.clearLayers();
 }
+
 
 // Haversine-Formel für Entfernungsberechnung
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -481,4 +485,30 @@ async function reverseGeocode(lat, lon) {
     } catch (error) {
         console.error('Reverse Geocoding fehler:', error);
     }
+}
+
+function showRoutePopup(destinationName, distance, timeMinutes) {
+    const popup = document.getElementById('routePopup');
+    const destinationEl = document.getElementById('oceanDestination');
+    const distanceEl = document.getElementById('oceanDistance');
+    const timeEl = document.getElementById('oceanDrivingTime');
+    const gmapsButton = document.getElementById('gmapsButton');
+    
+    destinationEl.textContent = destinationName;
+    distanceEl.textContent = `${Math.round(distance)} km`;
+    
+    const hours = Math.floor(timeMinutes / 60);
+    const minutes = timeMinutes % 60;
+    
+    timeEl.textContent = hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
+
+    // Google Maps Button Funktion
+    gmapsButton.onclick = () => {
+        if (currentUserLocation) {
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${currentUserLocation.lat},${currentUserLocation.lon}&destination=${encodeURIComponent(destinationName)}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+    };
+    
+    popup.classList.add('active');
 }

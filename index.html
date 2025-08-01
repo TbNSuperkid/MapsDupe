@@ -11,7 +11,7 @@
    <div class="container">
         <div class="search-bar" id="searchBar">
             <div class="search-container">
-                <input type="text" class="search-input" placeholder="Suche nach Orten, Adressen oder Sehenswürdigkeiten..." id="searchInput">
+                <input type="text" class="search-input" placeholder="Suche nach Orten oder Adressen" id="searchInput">
                 <button class="search-btn" onclick="performSearch()" title="Suchen">🔍</button>
                 <button class="ocean-btn" onclick="findNearestOcean()" title="Zum nächsten Meer">🌊</button>
                 <div class="suggestions" id="suggestions"></div>
@@ -33,6 +33,7 @@
         <div class="route-popup" id="routePopup">
             <div class="route-popup-header">
                 <div class="route-popup-title">Route zum Meer</div>
+                <button class="route-popup-gmaps" id="gmapsButton" title="In Google Maps öffnen">🗺️</button>
                 <button class="route-popup-close" onclick="closeRoutePopup()">✕</button>
             </div>
             <div class="route-popup-content">
