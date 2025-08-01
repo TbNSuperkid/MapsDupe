@@ -6,41 +6,15 @@
     <title>MyMaps</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <link rel="stylesheet" href="style.css"/>
-    
 </head>
 <body>
    <div class="container">
         <div class="search-bar" id="searchBar">
-            <!-- Single Search Mode -->
-            <div class="single-search" id="singleSearch">
-                <div class="search-container">
-                    <input type="text" class="search-input" placeholder="Suche nach Orten, Adressen oder Sehenswürdigkeiten..." id="searchInput">
-                    <button class="search-btn" onclick="performSearch()" title="Suchen">🔍</button>
-                    <button class="route-toggle-btn" onclick="toggleRouteMode()" title="Routenplanung">🗺️</button>
-                    <div class="suggestions" id="suggestions"></div>
-                </div>
-            </div>
-            
-            <!-- Route Planning Mode -->
-            <div class="route-container" id="routeContainer">
-                <div class="route-input-container" id="startContainer">
-                    <div class="route-icon start"></div>
-                    <input type="text" class="route-input" placeholder="Startpunkt eingeben..." id="startInput">
-                    <div class="route-controls">
-                        <button class="route-btn" onclick="swapRouteInputs()" title="Vertauschen">⇅</button>
-                    </div>
-                    <div class="suggestions" id="startSuggestions"></div>
-                </div>
-                
-                <div class="route-input-container" id="destinationContainer">
-                    <div class="route-icon destination"></div>
-                    <input type="text" class="route-input" placeholder="Zielort eingeben..." id="destinationInput">
-                    <div class="route-controls">
-                        <button class="route-btn" onclick="calculateRoute()" title="Route berechnen">🗺️</button>
-                        <button class="close-route-btn" onclick="toggleRouteMode()" title="Schließen">✕</button>
-                    </div>
-                    <div class="suggestions" id="destinationSuggestions"></div>
-                </div>
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Suche nach Orten, Adressen oder Sehenswürdigkeiten..." id="searchInput">
+                <button class="search-btn" onclick="performSearch()" title="Suchen">🔍</button>
+                <button class="ocean-btn" onclick="findNearestOcean()" title="Zum nächsten Meer">🌊</button>
+                <div class="suggestions" id="suggestions"></div>
             </div>
         </div>
         
@@ -54,7 +28,6 @@
         
         <div class="location-info" id="locationInfo" style="display: none;">
             <div id="locationText"></div>
-            <button class="ocean-btn" onclick="findNearestOcean()" id="oceanBtn">🌊 Zum Meer</button>
         </div>
         
         <div class="route-popup" id="routePopup">
@@ -102,6 +75,5 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="script.js"></script>
-
 </body>
 </html>
