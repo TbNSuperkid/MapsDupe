@@ -16,6 +16,75 @@ let currentUserLocation = null;
 let markersGroup = L.layerGroup().addTo(map);
 let currentLocationMarker = null;
 
+
+let coastlineData = null;
+
+async function loadCoastline() {
+    const response = await fetch('coastline.geojson');
+    coastlineData = await response.json();
+}
+
+
+function findNearestCoastPoint(userLat, userLon) {
+    if (!coastlineData || !coastlineData.features) return null;
+
+    let nearestPoint = null;
+    let shortestDistance = Infinity;
+
+    // Haversine Distanzberechnung
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // Erdradius in Metern
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // Entfernung in Metern
+    }
+
+    // Prüft und vergleicht alle Koordinaten
+    function checkCoordinates(coords) {
+        coords.forEach(coord => {
+            const [lon, lat] = coord;
+            const distance = getDistance(userLat, userLon, lat, lon);
+            if (distance < shortestDistance) {
+                shortestDistance = distance;
+                nearestPoint = { lat, lon };
+            }
+        });
+    }
+
+    coastlineData.features.forEach(feature => {
+        if (!feature.geometry) return;
+
+        const geom = feature.geometry;
+        if (geom.type === "LineString") {
+            checkCoordinates(geom.coordinates);
+        } 
+        else if (geom.type === "MultiLineString") {
+            geom.coordinates.forEach(line => checkCoordinates(line));
+        } 
+        else if (geom.type === "Polygon") {
+            geom.coordinates.forEach(ring => checkCoordinates(ring));
+        } 
+        else if (geom.type === "MultiPolygon") {
+            geom.coordinates.forEach(polygon =>
+                polygon.forEach(ring => checkCoordinates(ring))
+            );
+        }
+    });
+
+    return nearestPoint;
+}
+
+
+
+
 // OpenStreetMap-Suchfunktion
 async function searchOpenStreetMap(query, maxResults = 10) {
     const baseUrl = 'https://nominatim.openstreetmap.org/search';
@@ -263,63 +332,38 @@ document.addEventListener('click', function(e) {
 // Ocean Route Functions
 async function findNearestOcean() {
     if (!currentUserLocation) {
-        alert('Bitte wählen Sie zuerst einen Standort aus oder nutzen Sie die GPS-Funktion');
+        alert('Bitte Standort auswählen oder GPS nutzen');
         return;
     }
-    
+
     const oceanBtn = document.querySelector('.ocean-btn');
     oceanBtn.disabled = true;
     oceanBtn.textContent = '🌊 Suche...';
-    
+
     try {
-        // Bekannte Küstenstädte in Deutschland und Europa
-        const coastalCities = [
-            { name: 'Hamburg', lat: 53.5511, lon: 9.9937 },
-            { name: 'Bremen', lat: 53.0793, lon: 8.8017 },
-            { name: 'Kiel', lat: 54.3233, lon: 10.1228 },
-            { name: 'Rostock', lat: 54.0887, lon: 12.1342 },
-            { name: 'Stralsund', lat: 54.3091, lon: 13.0815 },
-            { name: 'Wilhelmshaven', lat: 53.5293, lon: 8.1067 },
-            { name: 'Cuxhaven', lat: 53.8667, lon: 8.7000 },
-            { name: 'Amsterdam', lat: 52.3676, lon: 4.9041 },
-            { name: 'Den Haag', lat: 52.0705, lon: 4.3007 },
-            { name: 'Calais', lat: 50.9513, lon: 1.8587 },
-            { name: 'Ostende', lat: 51.2287, lon: 2.9271 },
-            { name: 'Oostende', lat: 51.2287, lon: 2.9271 },
-            { name: 'Warnemünde', lat: 54.1775, lon: 12.0819 },
-            { name: 'St. Peter-Ording', lat: 54.3127, lon: 8.6364 }
-        ];
-        
-        // Nächste Küstenstadt finden
-        let nearestCoast = null;
-        let shortestDistance = Infinity;
-        
-        coastalCities.forEach(city => {
-            const distance = getDistance(
-                currentUserLocation.lat, currentUserLocation.lon,
-                city.lat, city.lon
-            );
-            
-            if (distance < shortestDistance) {
-                shortestDistance = distance;
-                nearestCoast = city;
-            }
-        });
+        if (!coastlineData) await loadCoastline();
+
+        const nearestCoast = findNearestCoastPoint(currentUserLocation.lat, currentUserLocation.lon);
         
         if (nearestCoast) {
-            await calculateOceanRoute(currentUserLocation, nearestCoast);
+            await calculateOceanRoute(currentUserLocation, {
+                name: "Meer",
+                lat: nearestCoast.lat,
+                lon: nearestCoast.lon
+            });
         } else {
             alert('Keine Küste gefunden');
         }
-        
     } catch (error) {
-        console.error('Fehler bei der Meer-Suche:', error);
-        alert('Fehler bei der Routenberechnung zum Meer');
+        console.error(error);
+        alert('Fehler bei der Meer-Suche');
     } finally {
         oceanBtn.disabled = false;
         oceanBtn.textContent = '🌊';
     }
 }
+
+
 
 async function calculateOceanRoute(start, destination) {
     try {
@@ -421,6 +465,12 @@ function closeRoutePopup() {
     if (oceanRouteLayer) {
         map.removeLayer(oceanRouteLayer);
         oceanRouteLayer = null;
+    }
+
+      // Searchbox leeren
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.value = '';
     }
     
     // Start- und Zielmarker löschen
