@@ -512,3 +512,20 @@ function showRoutePopup(destinationName, distance, timeMinutes) {
     
     popup.classList.add('active');
 }
+
+function isMobile() {
+    return (window.innerWidth <= 768) || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+if (isMobile()) {
+    console.log("Mobile erkannt");
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (isMobile()) {
+        // z. B. Popup anpassen
+        document.body.classList.add('mobile-view');
+    }
+});
+
+
