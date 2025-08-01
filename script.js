@@ -20,7 +20,7 @@ let currentLocationMarker = null;
 let coastlineData = null;
 
 async function loadCoastline() {
-    const response = await fetch('coastline.geojson');
+    const response = await fetch('coastline_detailed.geojson');
     coastlineData = await response.json();
 }
 
