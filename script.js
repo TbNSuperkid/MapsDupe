@@ -1,4 +1,4 @@
-// Karte initialisieren
+ // Karte initialisieren
         const map = L.map('map', {
             zoomControl: false
         }).setView([51.1657, 10.4515], 6);
@@ -13,6 +13,8 @@
         let routeStartLocation = null;
         let routeDestinationLocation = null;
         let currentRouteLayer = null;
+        let oceanRouteLayer = null;
+        let currentUserLocation = null;
         
         // Marker-Gruppe für Suchergebnisse
         let markersGroup = L.layerGroup().addTo(map);
@@ -453,6 +455,7 @@
         }
 
         function showLocationInfo(location) {
+            currentUserLocation = location; // Aktuelle Location speichern
             const locationInfo = document.getElementById('locationInfo');
             const locationText = document.getElementById('locationText');
             
@@ -461,7 +464,7 @@
                 <small>Koordinaten: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}</small>
             `;
             
-            locationInfo.style.display = 'block';
+            locationInfo.style.display = 'flex'; // Changed from 'block' to 'flex'
         }
 
         // Zoom-Kontrollen
@@ -531,6 +534,170 @@
                 document.getElementById('destinationContainer').classList.remove('has-suggestions');
             }
         });
+
+        // Ocean Route Functions
+        async function findNearestOcean() {
+            console.log('findNearestOcean called!', currentUserLocation); // Debug
+            
+            if (!currentUserLocation) {
+                alert('Keine aktuelle Position verfügbar');
+                return;
+            }
+            
+            const oceanBtn = document.getElementById('oceanBtn');
+            oceanBtn.disabled = true;
+            oceanBtn.textContent = '🌊 Suche...';
+            
+            try {
+                // Bekannte Küstenstädte in Deutschland und Europa
+                const coastalCities = [
+                    { name: 'Hamburg', lat: 53.5511, lon: 9.9937 },
+                    { name: 'Bremen', lat: 53.0793, lon: 8.8017 },
+                    { name: 'Kiel', lat: 54.3233, lon: 10.1228 },
+                    { name: 'Rostock', lat: 54.0887, lon: 12.1342 },
+                    { name: 'Stralsund', lat: 54.3091, lon: 13.0815 },
+                    { name: 'Wilhelmshaven', lat: 53.5293, lon: 8.1067 },
+                    { name: 'Cuxhaven', lat: 53.8667, lon: 8.7000 },
+                    { name: 'Amsterdam', lat: 52.3676, lon: 4.9041 },
+                    { name: 'Den Haag', lat: 52.0705, lon: 4.3007 },
+                    { name: 'Calais', lat: 50.9513, lon: 1.8587 },
+                    { name: 'Ostende', lat: 51.2287, lon: 2.9271 }
+                ];
+                
+                // Nächste Küstenstadt finden
+                let nearestCoast = null;
+                let shortestDistance = Infinity;
+                
+                coastalCities.forEach(city => {
+                    const distance = getDistance(
+                        currentUserLocation.lat, currentUserLocation.lon,
+                        city.lat, city.lon
+                    );
+                    
+                    if (distance < shortestDistance) {
+                        shortestDistance = distance;
+                        nearestCoast = city;
+                    }
+                });
+                
+                console.log('Nearest coast found:', nearestCoast); // Debug
+                
+                if (nearestCoast) {
+                    await calculateOceanRoute(currentUserLocation, nearestCoast);
+                } else {
+                    alert('Keine Küste gefunden');
+                }
+                
+            } catch (error) {
+                console.error('Fehler bei der Meer-Suche:', error);
+                alert('Fehler bei der Routenberechnung zum Meer');
+            } finally {
+                oceanBtn.disabled = false;
+                oceanBtn.textContent = '🌊 Zum Meer';
+            }
+        }
+
+        async function calculateOceanRoute(start, destination) {
+            console.log('Calculating route from', start, 'to', destination); // Debug
+            
+            try {
+                const distance = getDistance(start.lat, start.lon, destination.lat, destination.lon);
+                const drivingDistance = distance * 1.3; // Geschätzte Fahrstrecke (30% länger als Luftlinie)
+                const estimatedTime = Math.round(drivingDistance / 80 * 60); // ~80 km/h Durchschnitt
+                
+                // Route auf Karte zeichnen
+                if (oceanRouteLayer) {
+                    map.removeLayer(oceanRouteLayer);
+                }
+                
+                const routeCoords = [
+                    [start.lat, start.lon],
+                    [destination.lat, destination.lon]
+                ];
+                
+                oceanRouteLayer = L.polyline(routeCoords, {
+                    color: '#1e88e5',
+                    weight: 5,
+                    opacity: 0.8,
+                    dashArray: '10, 5'
+                }).addTo(map);
+                
+                // Marker für Ziel
+                const oceanMarker = L.marker([destination.lat, destination.lon], {
+                    icon: L.icon({
+                        iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iOCIgZmlsbD0iIzFlODhlNSIvPgo8dGV4dCB4PSI2IiB5PSIxNiIgZm9udC1zaXplPSIxNCIgZmlsbD0id2hpdGUiPvCfjIo8L3RleHQ+Cjwvc3ZnPgo=',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).bindPopup(`<b>🌊 ${destination.name}</b><br>Nächste Küste`);
+                
+                markersGroup.addLayer(oceanMarker);
+                
+                // Karte auf Route zentrieren
+                map.fitBounds(oceanRouteLayer.getBounds(), { padding: [20, 20] });
+                
+                // Route-Popup anzeigen
+                showRoutePopup(destination.name, drivingDistance, estimatedTime);
+                
+            } catch (error) {
+                console.error('Fehler bei der Routenberechnung:', error);
+                throw error;
+            }
+        }
+
+        function showRoutePopup(destinationName, distance, timeMinutes) {
+            console.log('Showing route popup:', destinationName, distance, timeMinutes); // Debug
+            
+            const popup = document.getElementById('routePopup');
+            const destinationEl = document.getElementById('oceanDestination');
+            const distanceEl = document.getElementById('oceanDistance');
+            const timeEl = document.getElementById('oceanDrivingTime');
+            
+            destinationEl.textContent = destinationName;
+            distanceEl.textContent = `${Math.round(distance)} km`;
+            
+            const hours = Math.floor(timeMinutes / 60);
+            const minutes = timeMinutes % 60;
+            
+            if (hours > 0) {
+                timeEl.textContent = `${hours}h ${minutes}min`;
+            } else {
+                timeEl.textContent = `${minutes} min`;
+            }
+            
+            popup.classList.add('active');
+        }
+
+        function closeRoutePopup() {
+            const popup = document.getElementById('routePopup');
+            popup.classList.remove('active');
+            
+            // Route löschen
+            if (oceanRouteLayer) {
+                map.removeLayer(oceanRouteLayer);
+                oceanRouteLayer = null;
+            }
+            
+            // Ocean marker entfernen - aber nicht alle Marker löschen
+            // markersGroup.clearLayers(); // Kommentiert aus, damit andere Marker bleiben
+        }
+
+        // Haversine-Formel für Entfernungsberechnung
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Erdradius in km
+            const dLat = toRadians(lat2 - lat1);
+            const dLon = toRadians(lon2 - lon1);
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+                Math.sin(dLat/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function toRadians(degrees) {
+            return degrees * (Math.PI/180);
+        }
 
         // Initialisierung - Setup wird automatisch beim ersten Toggle aufgerufen
         console.log('Script loaded successfully'); // Debug

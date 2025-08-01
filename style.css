@@ -310,6 +310,114 @@
             z-index: 1000;
             font-size: 14px;
             max-width: 300px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ocean-btn {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+            transition: background-color 0.3s;
+        }
+
+        .ocean-btn:hover {
+            background: #1565c0;
+        }
+
+        .ocean-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .route-popup {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1001;
+            min-width: 300px;
+            max-width: 400px;
+            display: none;
+        }
+
+        .route-popup.active {
+            display: block;
+        }
+
+        .route-popup-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e8eaed;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .route-popup-title {
+            font-weight: 500;
+            font-size: 16px;
+            color: #333;
+            flex: 1;
+        }
+
+        .route-popup-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .route-popup-close:hover {
+            background: #f5f5f5;
+        }
+
+        .route-popup-content {
+            padding: 20px;
+        }
+
+        .route-info-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .route-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .route-info-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .route-info-text {
+            flex: 1;
+        }
+
+        .route-info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .route-info-value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
         }
 
         .loading {

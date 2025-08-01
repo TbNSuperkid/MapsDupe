@@ -9,7 +9,7 @@
     
 </head>
 <body>
-    <div class="container">
+   <div class="container">
         <div class="search-bar" id="searchBar">
             <!-- Single Search Mode -->
             <div class="single-search" id="singleSearch">
@@ -54,6 +54,44 @@
         
         <div class="location-info" id="locationInfo" style="display: none;">
             <div id="locationText"></div>
+            <button class="ocean-btn" onclick="findNearestOcean()" id="oceanBtn">🌊 Zum Meer</button>
+        </div>
+        
+        <div class="route-popup" id="routePopup">
+            <div class="route-popup-header">
+                <div class="route-popup-title">Route zum Meer</div>
+                <button class="route-popup-close" onclick="closeRoutePopup()">✕</button>
+            </div>
+            <div class="route-popup-content">
+                <div class="route-info-item">
+                    <div class="route-info-icon">📍</div>
+                    <div class="route-info-text">
+                        <div class="route-info-label">Ziel</div>
+                        <div class="route-info-value" id="oceanDestination">-</div>
+                    </div>
+                </div>
+                <div class="route-info-item">
+                    <div class="route-info-icon">📏</div>
+                    <div class="route-info-text">
+                        <div class="route-info-label">Entfernung</div>
+                        <div class="route-info-value" id="oceanDistance">-</div>
+                    </div>
+                </div>
+                <div class="route-info-item">
+                    <div class="route-info-icon">🕐</div>
+                    <div class="route-info-text">
+                        <div class="route-info-label">Fahrzeit</div>
+                        <div class="route-info-value" id="oceanDrivingTime">-</div>
+                    </div>
+                </div>
+                <div class="route-info-item">
+                    <div class="route-info-icon">🚗</div>
+                    <div class="route-info-text">
+                        <div class="route-info-label">Route</div>
+                        <div class="route-info-value">Kürzeste Fahrstrecke</div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="loading" id="loading">
