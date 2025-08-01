@@ -520,12 +520,23 @@ function isMobile() {
 if (isMobile()) {
     console.log("Mobile erkannt");
 }
-
+/*
 document.addEventListener('DOMContentLoaded', () => {
-    if (isMobile()) {
-        // z. B. Popup anpassen
-        document.body.classList.add('mobile-view');
+  const btnRouteMeer = document.getElementById('ocean-btn');
+  const routePopup = document.querySelector('.route-popup');
+  const popupCloseBtn = routePopup.querySelector('.route-popup-close');
+
+  btnRouteMeer.addEventListener('click', () => {
+    if(isMobile()) {
+      // Mobile: Route Popup direkt öffnen
+      routePopup.classList.add('active');
     }
+  });
+
+  popupCloseBtn.addEventListener('click', () => {
+    routePopup.classList.remove('active');
+  });
 });
+*/
 
 
