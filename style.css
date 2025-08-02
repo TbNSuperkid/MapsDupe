@@ -501,17 +501,6 @@ body {
     margin-top: 2px;
 }
 
-
-  /* Zoom- und Location Buttons unten rechts */
-  .controls {
-    top: auto;
-    bottom: 20px;
-    right: 20px;
-    flex-direction: row;
-    gap: 10px;
-    z-index: 1100;
-  }
-
   /* Für bessere Anordnung Buttons nebeneinander */
   .control-btn {
     width: 50px;
@@ -540,22 +529,28 @@ body {
   display: block;
 }
 
-  /* Damit Popup die Buttons überdeckt */
-  .controls {
-    position: fixed;
-  }
-
   .location-info {
-    position: absolute;
+    /*position: absolute;*/
+    top: auto;
     bottom: 20px;
     left: 20px;
     background: white;
     padding: 15px 20px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    z-index: 1000;
+    z-index: 1100;
     font-size: 14px;
     max-width: 300px;
 }
+
+/* Zoom- und Location Buttons unten rechts */
+  .controls {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    flex-direction: row;
+    gap: 10px;
+    z-index: 1100;
+  }
   
 }
