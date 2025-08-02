@@ -31,7 +31,7 @@ function findNearestCoastPoint(userLat, userLon) {
     let nearestPoint = null;
     let shortestDistance = Infinity;
 
-    // Haversine Distanzberechnung
+    // Haversine Distanzberechnung (Meter)
     function getDistance(lat1, lon1, lat2, lon2) {
         const R = 6371e3; // Erdradius in Metern
         const φ1 = lat1 * Math.PI / 180;
@@ -59,6 +59,7 @@ function findNearestCoastPoint(userLat, userLon) {
         });
     }
 
+    // 1️⃣ Nächsten Punkt finden
     coastlineData.features.forEach(feature => {
         if (!feature.geometry) return;
 
@@ -79,9 +80,125 @@ function findNearestCoastPoint(userLat, userLon) {
         }
     });
 
+    if (!nearestPoint) return null;
+
+    // 2️⃣ Punkte im erweiterten Radius zählen
+    const radiusWithBuffer = shortestDistance + 100000; // +100 km (in Metern)
+    let pointsInRadius = 0;
+
+    function countPointsInRadius(coords) {
+        coords.forEach(coord => {
+            const [lon, lat] = coord;
+            const dist = getDistance(nearestPoint.lat, nearestPoint.lon, lat, lon);
+            if (dist <= radiusWithBuffer) {
+                pointsInRadius++;
+            }
+        });
+    }
+
+    coastlineData.features.forEach(feature => {
+        if (!feature.geometry) return;
+        const geom = feature.geometry;
+        if (geom.type === "LineString") {
+            countPointsInRadius(geom.coordinates);
+        }
+        else if (geom.type === "MultiLineString") {
+            geom.coordinates.forEach(line => countPointsInRadius(line));
+        }
+        else if (geom.type === "Polygon") {
+            geom.coordinates.forEach(ring => countPointsInRadius(ring));
+        }
+        else if (geom.type === "MultiPolygon") {
+            geom.coordinates.forEach(polygon =>
+                polygon.forEach(ring => countPointsInRadius(ring))
+            );
+        }
+    });
+
+    console.log(`Küstenpunkte innerhalb ${Math.round(radiusWithBuffer / 1000)} km: ${pointsInRadius}`);
+    
+
     return nearestPoint;
 }
 
+
+async function findNearestCoastPointByDriveTime(userLat, userLon, step = 50, topCandidates = 5) {
+    if (!coastlineData || !coastlineData.features) return null;
+
+    const candidates = [];
+    
+    // Haversine Distanzberechnung
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(Δφ / 2) ** 2 +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // Grobsuche
+    coastlineData.features.forEach(feature => {
+        if (!feature.geometry) return;
+        let coordsArray = [];
+
+        if (feature.geometry.type === "LineString") {
+            coordsArray.push(feature.geometry.coordinates);
+        } else if (feature.geometry.type === "MultiLineString") {
+            coordsArray = coordsArray.concat(feature.geometry.coordinates);
+        } else if (feature.geometry.type === "Polygon") {
+            coordsArray = coordsArray.concat(feature.geometry.coordinates);
+        } else if (feature.geometry.type === "MultiPolygon") {
+            feature.geometry.coordinates.forEach(polygon =>
+                coordsArray = coordsArray.concat(polygon)
+            );
+        }
+
+        coordsArray.forEach(coords => {
+            for (let i = 0; i < coords.length; i += step) {
+                const [lon, lat] = coords[i];
+                const distance = getDistance(userLat, userLon, lat, lon);
+                candidates.push({ lat, lon, distance });
+            }
+        });
+    });
+
+    // Top Kandidaten nach Luftlinie
+    candidates.sort((a, b) => a.distance - b.distance);
+    const bestCandidates = candidates.slice(0, topCandidates);
+
+    // Feinsuche mit OSRM (tatsächliche Fahrzeit)
+    let bestPoint = null;
+    let shortestTime = Infinity;
+
+    for (const candidate of bestCandidates) {
+        const routeUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${candidate.lon},${candidate.lat}?overview=false`;
+        try {
+            const res = await fetch(routeUrl);
+            const data = await res.json();
+            if (data.routes && data.routes.length > 0) {
+                const duration = data.routes[0].duration; // Sekunden
+                if (duration < shortestTime) {
+                    shortestTime = duration;
+                    bestPoint = candidate;
+                }
+            }
+        } catch (err) {
+            console.error("Fehler bei OSRM Anfrage:", err);
+        }
+    }
+
+    if (bestPoint) {
+        console.log(`Beste Fahrzeit: ${(shortestTime/60).toFixed(1)} min zu Punkt (${bestPoint.lat}, ${bestPoint.lon})`);
+        return bestPoint;
+    }
+    
+    return null;
+}
 
 
 
@@ -343,7 +460,7 @@ async function findNearestOcean() {
     try {
         if (!coastlineData) await loadCoastline();
 
-        const nearestCoast = findNearestCoastPoint(currentUserLocation.lat, currentUserLocation.lon);
+        const nearestCoast = await findNearestCoastPointByDriveTime(currentUserLocation.lat, currentUserLocation.lon);
         
         if (nearestCoast) {
             await calculateOceanRoute(currentUserLocation, {
