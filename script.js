@@ -24,127 +24,6 @@ async function loadCoastline() {
     coastlineData = await response.json();
 }
 
-/*async function getDriveTimesBatch(startLat, startLon, coastPoints) {
-    // Erstelle OSRM Table Request
-    const coords = [
-        `${startLon},${startLat}`, // Startpunkt
-        ...coastPoints.map(p => `${p.lon},${p.lat}`)
-    ].join(';');
-
-    const url = `https://router.project-osrm.org/table/v1/driving/${coords}?sources=0`; 
-    // sources=0 bedeutet: wir wollen die Dauer von Startpunkt zu allen anderen
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.durations && data.durations[0]) {
-        // Die Dauer in Sekunden für jeden Punkt
-        return coastPoints.map((point, index) => ({
-            ...point,
-            duration: data.durations[0][index + 1] // Index +1, weil Startpunkt an Pos 0 ist
-        }));
-    } else {
-        throw new Error('Keine OSRM Table Daten erhalten');
-    }
-}*/
-
-
-/*function findNearestCoastPoint(userLat, userLon) {
-    if (!coastlineData || !coastlineData.features) return null;
-
-    let nearestPoint = null;
-    let shortestDistance = Infinity;
-
-    // Haversine Distanzberechnung (Meter)
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Erdradius in Metern
-        const φ1 = lat1 * Math.PI / 180;
-        const φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c; // Entfernung in Metern
-    }
-
-    // Prüft und vergleicht alle Koordinaten
-    function checkCoordinates(coords) {
-        coords.forEach(coord => {
-            const [lon, lat] = coord;
-            const distance = getDistance(userLat, userLon, lat, lon);
-            if (distance < shortestDistance) {
-                shortestDistance = distance;
-                nearestPoint = { lat, lon };
-            }
-        });
-    }
-
-    // 1️⃣ Nächsten Punkt finden
-    coastlineData.features.forEach(feature => {
-        if (!feature.geometry) return;
-
-        const geom = feature.geometry;
-        if (geom.type === "LineString") {
-            checkCoordinates(geom.coordinates);
-        } 
-        else if (geom.type === "MultiLineString") {
-            geom.coordinates.forEach(line => checkCoordinates(line));
-        } 
-        else if (geom.type === "Polygon") {
-            geom.coordinates.forEach(ring => checkCoordinates(ring));
-        } 
-        else if (geom.type === "MultiPolygon") {
-            geom.coordinates.forEach(polygon =>
-                polygon.forEach(ring => checkCoordinates(ring))
-            );
-        }
-    });
-
-    if (!nearestPoint) return null;
-
-    // 2️⃣ Punkte im erweiterten Radius zählen
-    const radiusWithBuffer = shortestDistance + 100000; // +100 km (in Metern)
-    let pointsInRadius = 0;
-
-    function countPointsInRadius(coords) {
-        coords.forEach(coord => {
-            const [lon, lat] = coord;
-            const dist = getDistance(nearestPoint.lat, nearestPoint.lon, lat, lon);
-            if (dist <= radiusWithBuffer) {
-                pointsInRadius++;
-            }
-        });
-    }
-
-    coastlineData.features.forEach(feature => {
-        if (!feature.geometry) return;
-        const geom = feature.geometry;
-        if (geom.type === "LineString") {
-            countPointsInRadius(geom.coordinates);
-        }
-        else if (geom.type === "MultiLineString") {
-            geom.coordinates.forEach(line => countPointsInRadius(line));
-        }
-        else if (geom.type === "Polygon") {
-            geom.coordinates.forEach(ring => countPointsInRadius(ring));
-        }
-        else if (geom.type === "MultiPolygon") {
-            geom.coordinates.forEach(polygon =>
-                polygon.forEach(ring => countPointsInRadius(ring))
-            );
-        }
-    });
-
-    console.log(`Küstenpunkte innerhalb ${Math.round(radiusWithBuffer / 1000)} km: ${pointsInRadius}`);
-    
-
-    return nearestPoint;
-}*/
-
 
 async function findNearestCoastPointByDriveTime(userLat, userLon) {
     if (!coastlineData || !coastlineData.features) return null;
@@ -571,10 +450,12 @@ async function findNearestOcean() {
 
     const oceanBtn = document.querySelector('.ocean-btn');
     oceanBtn.disabled = true;
-    oceanBtn.textContent = '🌊 Suche...';
+    //oceanBtn.textContent = '🌊 Suche...';
 
     try {
         if (!coastlineData) await loadCoastline();
+
+        showLoading(true);
 
         const nearestCoast = await findNearestCoastPointByDriveTime(currentUserLocation.lat, currentUserLocation.lon);
         
@@ -669,26 +550,6 @@ async function calculateOceanRoute(start, destination) {
     }
 }
 
-/*function showRoutePopup(destination, distance, timeMinutes) {
-    const popup = document.getElementById('routePopup');
-    const destinationEl = document.getElementById('oceanDestination');
-    const distanceEl = document.getElementById('oceanDistance');
-    const timeEl = document.getElementById('oceanDrivingTime');
-    
-    destinationEl.textContent = destination.name;
-    distanceEl.textContent = `${Math.round(distance)} km`;
-    
-    const hours = Math.floor(timeMinutes / 60);
-    const minutes = timeMinutes % 60;
-    
-    if (hours > 0) {
-        timeEl.textContent = `${hours}h ${minutes}min`;
-    } else {
-        timeEl.textContent = `${minutes} min`;
-    }
-    
-    popup.classList.add('active');
-}*/
 
 function closeRoutePopup() {
     const popup = document.getElementById('routePopup');
@@ -745,6 +606,13 @@ map.on('click', function(e) {
 });
 
 async function reverseGeocode(lat, lon) {
+
+    // Vorherige Route löschen
+    if (oceanRouteLayer) {
+        map.removeLayer(oceanRouteLayer);
+        oceanRouteLayer = null;
+    }
+
     try {
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
         const data = await response.json();
@@ -777,6 +645,8 @@ function showRoutePopup(destination, distance, timeMinutes) {
     const timeEl = document.getElementById('oceanDrivingTime');
     const gmapsButton = document.getElementById('gmapsButton');
     
+    showLoading(false);
+
     destinationEl.textContent = destination.name;
     distanceEl.textContent = `${Math.round(distance)} km`;
     
@@ -803,23 +673,6 @@ function isMobile() {
 if (isMobile()) {
     console.log("Mobile erkannt");
 }
-/*
-document.addEventListener('DOMContentLoaded', () => {
-  const btnRouteMeer = document.getElementById('ocean-btn');
-  const routePopup = document.querySelector('.route-popup');
-  const popupCloseBtn = routePopup.querySelector('.route-popup-close');
 
-  btnRouteMeer.addEventListener('click', () => {
-    if(isMobile()) {
-      // Mobile: Route Popup direkt öffnen
-      routePopup.classList.add('active');
-    }
-  });
-
-  popupCloseBtn.addEventListener('click', () => {
-    routePopup.classList.remove('active');
-  });
-});
-*/
 
 
