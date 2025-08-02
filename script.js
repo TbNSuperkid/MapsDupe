@@ -24,8 +24,32 @@ async function loadCoastline() {
     coastlineData = await response.json();
 }
 
+/*async function getDriveTimesBatch(startLat, startLon, coastPoints) {
+    // Erstelle OSRM Table Request
+    const coords = [
+        `${startLon},${startLat}`, // Startpunkt
+        ...coastPoints.map(p => `${p.lon},${p.lat}`)
+    ].join(';');
 
-function findNearestCoastPoint(userLat, userLon) {
+    const url = `https://router.project-osrm.org/table/v1/driving/${coords}?sources=0`; 
+    // sources=0 bedeutet: wir wollen die Dauer von Startpunkt zu allen anderen
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.durations && data.durations[0]) {
+        // Die Dauer in Sekunden für jeden Punkt
+        return coastPoints.map((point, index) => ({
+            ...point,
+            duration: data.durations[0][index + 1] // Index +1, weil Startpunkt an Pos 0 ist
+        }));
+    } else {
+        throw new Error('Keine OSRM Table Daten erhalten');
+    }
+}*/
+
+
+/*function findNearestCoastPoint(userLat, userLon) {
     if (!coastlineData || !coastlineData.features) return null;
 
     let nearestPoint = null;
@@ -119,14 +143,12 @@ function findNearestCoastPoint(userLat, userLon) {
     
 
     return nearestPoint;
-}
+}*/
 
 
-async function findNearestCoastPointByDriveTime(userLat, userLon, step = 50, topCandidates = 5) {
+async function findNearestCoastPointByDriveTime(userLat, userLon) {
     if (!coastlineData || !coastlineData.features) return null;
 
-    const candidates = [];
-    
     // Haversine Distanzberechnung
     function getDistance(lat1, lon1, lat2, lon2) {
         const R = 6371e3;
@@ -141,7 +163,36 @@ async function findNearestCoastPointByDriveTime(userLat, userLon, step = 50, top
         return R * c;
     }
 
-    // Grobsuche
+    // OSRM Table Request Hilfsfunktion
+    async function getOSRMDurations(userLat, userLon, candidates) {
+        if (candidates.length === 0) return [];
+        
+        try {
+            const sourceCoord = `${userLon},${userLat}`;
+            const destinationCoords = candidates.map(c => `${c.lon},${c.lat}`).join(';');
+            const allCoords = `${sourceCoord};${destinationCoords}`;
+            
+            const tableUrl = `https://router.project-osrm.org/table/v1/driving/${allCoords}?sources=0&destinations=${Array.from({length: candidates.length}, (_, i) => i + 1).join(';')}`;
+            
+            const res = await fetch(tableUrl);
+            const data = await res.json();
+            
+            if (data.durations && data.durations[0]) {
+                return data.durations[0].map((duration, index) => ({
+                    ...candidates[index],
+                    driveTime: duration
+                }));
+            }
+        } catch (err) {
+            console.error("Fehler bei OSRM Table Anfrage:", err);
+        }
+        return [];
+    }
+
+    // Schritt 1: Alle Küstenpunkte sammeln
+    console.log("Schritt 1: Sammle alle Küstenpunkte...");
+    const allCoastPoints = [];
+    
     coastlineData.features.forEach(feature => {
         if (!feature.geometry) return;
         let coordsArray = [];
@@ -159,45 +210,110 @@ async function findNearestCoastPointByDriveTime(userLat, userLon, step = 50, top
         }
 
         coordsArray.forEach(coords => {
-            for (let i = 0; i < coords.length; i += step) {
-                const [lon, lat] = coords[i];
+            coords.forEach(([lon, lat], index) => {
                 const distance = getDistance(userLat, userLon, lat, lon);
-                candidates.push({ lat, lon, distance });
-            }
+                allCoastPoints.push({ 
+                    lat, 
+                    lon, 
+                    distance,
+                    originalIndex: allCoastPoints.length,
+                    coordsIndex: index
+                });
+            });
         });
     });
 
-    // Top Kandidaten nach Luftlinie
-    candidates.sort((a, b) => a.distance - b.distance);
-    const bestCandidates = candidates.slice(0, topCandidates);
+    console.log(`Gefunden: ${allCoastPoints.length} Küstenpunkte`);
 
-    // Feinsuche mit OSRM (tatsächliche Fahrzeit)
-    let bestPoint = null;
-    let shortestTime = Infinity;
+    // Schritt 2: Kürzeste Luftlinie finden
+    allCoastPoints.sort((a, b) => a.distance - b.distance);
+    const nearestPoint = allCoastPoints[0];
+    const radiusKm = nearestPoint.distance / 1000 + 100; // +100km
+    
+    console.log(`Schritt 2: Kürzeste Luftlinie: ${(nearestPoint.distance/1000).toFixed(1)}km`);
+    console.log(`Suchradius: ${radiusKm.toFixed(1)}km`);
 
-    for (const candidate of bestCandidates) {
-        const routeUrl = `https://router.project-osrm.org/route/v1/driving/${userLon},${userLat};${candidate.lon},${candidate.lat}?overview=false`;
-        try {
-            const res = await fetch(routeUrl);
-            const data = await res.json();
-            if (data.routes && data.routes.length > 0) {
-                const duration = data.routes[0].duration; // Sekunden
-                if (duration < shortestTime) {
-                    shortestTime = duration;
-                    bestPoint = candidate;
-                }
-            }
-        } catch (err) {
-            console.error("Fehler bei OSRM Anfrage:", err);
-        }
-    }
+    // Schritt 3: Alle Punkte im Radius finden
+    const pointsInRadius = allCoastPoints.filter(point => 
+        point.distance <= radiusKm * 1000
+    );
+    
+    console.log(`Schritt 3: ${pointsInRadius.length} Punkte im ${radiusKm.toFixed(1)}km Radius`);
 
-    if (bestPoint) {
-        console.log(`Beste Fahrzeit: ${(shortestTime/60).toFixed(1)} min zu Punkt (${bestPoint.lat}, ${bestPoint.lon})`);
-        return bestPoint;
+    // Schritt 4: Jeden 50. Punkt für grobe Suche
+    const coarseSearchPoints = [];
+    for (let i = 0; i < pointsInRadius.length; i += 50) {
+        coarseSearchPoints.push({
+            ...pointsInRadius[i],
+            radiusIndex: i
+        });
     }
     
-    return null;
+    console.log(`Schritt 4: ${coarseSearchPoints.length} Punkte für grobe Suche (jeden 50.)`);
+
+    // Schritt 5: OSRM Table Request für grobe Suche
+    console.log("Schritt 5: OSRM Table Request für grobe Suche...");
+    const coarseResults = await getOSRMDurations(userLat, userLon, coarseSearchPoints);
+    
+    if (coarseResults.length === 0) {
+        console.log("Keine Routen in grober Suche gefunden");
+        return null;
+    }
+
+    // Besten Punkt aus grober Suche finden
+    const validResults = coarseResults.filter(r => r.driveTime !== null);
+    if (validResults.length === 0) {
+        console.log("Keine gültigen Routen gefunden");
+        return null;
+    }
+
+    validResults.sort((a, b) => a.driveTime - b.driveTime);
+    const bestCoarsePoint = validResults[0];
+    const bestCoarseIndex = bestCoarsePoint.radiusIndex;
+    
+    console.log(`Bester grober Punkt: ${(bestCoarsePoint.driveTime/60).toFixed(1)} min bei Index ${bestCoarseIndex}`);
+
+    // Schritt 6: Feinsuche - 50 Punkte links und rechts
+    console.log("Schritt 6: Feinsuche um besten groben Punkt...");
+    const fineSearchStart = Math.max(0, bestCoarseIndex - 50);
+    const fineSearchEnd = Math.min(pointsInRadius.length, bestCoarseIndex + 51);
+    
+    const fineSearchPoints = pointsInRadius.slice(fineSearchStart, fineSearchEnd);
+    console.log(`Feinsuche: ${fineSearchPoints.length} Punkte (Index ${fineSearchStart} bis ${fineSearchEnd-1})`);
+
+    // Schritt 7: OSRM Table Request für Feinsuche
+    console.log("Schritt 7: OSRM Table Request für Feinsuche...");
+    const fineResults = await getOSRMDurations(userLat, userLon, fineSearchPoints);
+    
+    if (fineResults.length === 0) {
+        console.log("Keine Routen in Feinsuche gefunden, verwende groben Punkt");
+        return {
+            ...bestCoarsePoint,
+            searchType: 'coarse'
+        };
+    }
+
+    // Besten Punkt aus Feinsuche finden
+    const validFineResults = fineResults.filter(r => r.driveTime !== null);
+    if (validFineResults.length === 0) {
+        console.log("Keine gültigen Routen in Feinsuche, verwende groben Punkt");
+        return {
+            ...bestCoarsePoint,
+            searchType: 'coarse'
+        };
+    }
+
+    validFineResults.sort((a, b) => a.driveTime - b.driveTime);
+    const bestFinePoint = validFineResults[0];
+    
+    console.log(`Beste Fahrzeit: ${(bestFinePoint.driveTime/60).toFixed(1)} min zu Punkt (${bestFinePoint.lat.toFixed(6)}, ${bestFinePoint.lon.toFixed(6)})`);
+    console.log(`Verbesserung gegenüber grober Suche: ${((bestCoarsePoint.driveTime - bestFinePoint.driveTime)/60).toFixed(1)} min`);
+    
+    return {
+        ...bestFinePoint,
+        searchType: 'fine',
+        improvement: bestCoarsePoint.driveTime - bestFinePoint.driveTime
+    };
 }
 
 
@@ -512,7 +628,7 @@ async function calculateOceanRoute(start, destination) {
             }).addTo(map);
             
             // Route-Popup anzeigen
-            showRoutePopup(destination.name, drivingDistance, estimatedTime);
+            showRoutePopup(destination, drivingDistance, estimatedTime);
         } else {
             // Fallback auf Luftlinie falls API nicht funktioniert
             const drivingDistance = distance * 1.3;
@@ -553,13 +669,13 @@ async function calculateOceanRoute(start, destination) {
     }
 }
 
-function showRoutePopup(destinationName, distance, timeMinutes) {
+/*function showRoutePopup(destination, distance, timeMinutes) {
     const popup = document.getElementById('routePopup');
     const destinationEl = document.getElementById('oceanDestination');
     const distanceEl = document.getElementById('oceanDistance');
     const timeEl = document.getElementById('oceanDrivingTime');
     
-    destinationEl.textContent = destinationName;
+    destinationEl.textContent = destination.name;
     distanceEl.textContent = `${Math.round(distance)} km`;
     
     const hours = Math.floor(timeMinutes / 60);
@@ -572,7 +688,7 @@ function showRoutePopup(destinationName, distance, timeMinutes) {
     }
     
     popup.classList.add('active');
-}
+}*/
 
 function closeRoutePopup() {
     const popup = document.getElementById('routePopup');
@@ -654,14 +770,14 @@ async function reverseGeocode(lat, lon) {
     }
 }
 
-function showRoutePopup(destinationName, distance, timeMinutes) {
+function showRoutePopup(destination, distance, timeMinutes) {
     const popup = document.getElementById('routePopup');
     const destinationEl = document.getElementById('oceanDestination');
     const distanceEl = document.getElementById('oceanDistance');
     const timeEl = document.getElementById('oceanDrivingTime');
     const gmapsButton = document.getElementById('gmapsButton');
     
-    destinationEl.textContent = destinationName;
+    destinationEl.textContent = destination.name;
     distanceEl.textContent = `${Math.round(distance)} km`;
     
     const hours = Math.floor(timeMinutes / 60);
@@ -669,13 +785,13 @@ function showRoutePopup(destinationName, distance, timeMinutes) {
     
     timeEl.textContent = hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
 
-    // Google Maps Button Funktion
-    gmapsButton.onclick = () => {
-        if (currentUserLocation) {
-            const url = `https://www.google.com/maps/dir/?api=1&origin=${currentUserLocation.lat},${currentUserLocation.lon}&destination=${encodeURIComponent(destinationName)}&travelmode=driving`;
-            window.open(url, '_blank');
-        }
-    };
+    // Nur Koordinaten
+gmapsButton.onclick = () => {
+    if (currentUserLocation && destination) {
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${currentUserLocation.lat},${currentUserLocation.lon}&destination=${destination.lat},${destination.lon}&travelmode=driving`;
+        window.open(url, '_blank');
+    }
+};
     
     popup.classList.add('active');
 }
