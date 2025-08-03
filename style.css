@@ -546,7 +546,8 @@ body {
   }
 
   .location-info {
-    position: absolute;
+    position: fixed;
+    top: auto  ;
     bottom: 20px;
     left: 20px;
     background: white;
